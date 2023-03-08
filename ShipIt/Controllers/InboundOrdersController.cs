@@ -32,37 +32,69 @@ namespace ShipIt.Controllers
         {
             Log.Info("orderIn for warehouseId: " + warehouseId);
 
+            //A DB call here
             var operationsManager = new Employee(_employeeRepository.GetOperationsManager(warehouseId));
 
             Log.Debug(String.Format("Found operations manager: {0}", operationsManager));
 
+            //A DB call here
+            //the allStock contains a list of StockDataModels: 
+            //Stock Data Models can contain a productID, a Warehouse Id and an int 'held' indicating how many are in the warehouse
             var allStock = _stockRepository.GetStockByWarehouseId(warehouseId);
 
+            //This variable will store all the order lines that have come into this warehouse, sorted by company 
             Dictionary<Company, List<InboundOrderLine>> orderlinesByCompany = new Dictionary<Company, List<InboundOrderLine>>();
+
             foreach (var stock in allStock)
             {
+                //We could get everything outside the forLoop; i.e. get all the product info . Not a great solution
+                // 
+                //A DB call here
+                bool containsCompanyKey = false;
                 Product product = new Product(_productRepository.GetProductById(stock.ProductId));
-                if(stock.held < product.LowerThreshold && !product.Discontinued)
+                if (stock.held < product.LowerThreshold && !product.Discontinued)
                 {
-                    Company company = new Company(_companyRepository.GetCompany(product.Gcp));
-
-                    var orderQuantity = Math.Max(product.LowerThreshold * 3 - stock.held, product.MinimumOrderQuantity);
-
-                    if (!orderlinesByCompany.ContainsKey(company))
+                    foreach (var companykey in orderlinesByCompany.Keys)
                     {
-                        orderlinesByCompany.Add(company, new List<InboundOrderLine>());
-                    }
-
-                    orderlinesByCompany[company].Add( 
+                        if (companykey.Gcp == product.Gcp)
+                        {
+                            var ourorderQuantity = Math.Max(product.LowerThreshold * 3 - stock.held, product.MinimumOrderQuantity);
+                            orderlinesByCompany[companykey].Add(
                         new InboundOrderLine()
                         {
                             gtin = product.Gtin,
                             name = product.Name,
-                            quantity = orderQuantity
+                            quantity = ourorderQuantity
                         });
+                            containsCompanyKey = true;
+                            break; // we need to exit from the whole 
+                        }
+                    }
+                    //A DB call here
+                    //go into the key of the existing dictionary, and check if product.Gcp == Company.Gcp
+                    //if the dictionary's key, which is a Company class instance, contains the gcp attribute which is equal to our product.gcp,
+                    // don't bother to make an api call
+                    if (!containsCompanyKey)
+                    {
+                        Company company = new Company(_companyRepository.GetCompany(product.Gcp));
+
+                        var orderQuantity = Math.Max(product.LowerThreshold * 3 - stock.held, product.MinimumOrderQuantity);
+
+                        if (!orderlinesByCompany.ContainsKey(company))
+                        {
+
+                            orderlinesByCompany.Add(company, new List<InboundOrderLine>());
+                        }
+                        orderlinesByCompany[company].Add(
+                            new InboundOrderLine()
+                            {
+                                gtin = product.Gtin,
+                                name = product.Name,
+                                quantity = orderQuantity
+                            });
+                    }
                 }
             }
-
             Log.Debug(String.Format("Constructed order lines: {0}", orderlinesByCompany));
 
             var orderSegments = orderlinesByCompany.Select(ol => new OrderSegment()

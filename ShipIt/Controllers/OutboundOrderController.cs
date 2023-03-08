@@ -1,8 +1,8 @@
 ﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
- using Microsoft.AspNetCore.Mvc;
- using ShipIt.Exceptions;
+using Microsoft.AspNetCore.Mvc;
+using ShipIt.Exceptions;
 using ShipIt.Models.ApiModels;
 using ShipIt.Repositories;
 
@@ -22,10 +22,19 @@ namespace ShipIt.Controllers
             _productRepository = productRepository;
         }
 
+        // At the moment there is no way of knowing how many trucks we are going to need to fulfil each order that we receive.
+        // Please improve the OutBoundOrder endpoint so that it shows roughly how many trucks we will need in order to fit everything in the order. (each truck can contain a max of 2000kg)
+        // We don’t mind too much what the format is for the new data, but please:
+        // give it a nice clear name
+        // don’t break any backwards compatibility. (ie don’t change any of the existing data)
+
+
         [HttpPost("")]
-        public void Post([FromBody] OutboundOrderRequestModel request)
+        //It can't be right to change this into a returning int statement
+        public int Post([FromBody] OutboundOrderRequestModel request)
         {
             Log.Info(String.Format("Processing outbound order: {0}", request));
+            //Log.Info on number of trucks here 
 
             var gtins = new List<String>();
             foreach (var orderLine in request.OrderLines)
@@ -43,6 +52,21 @@ namespace ShipIt.Controllers
             var lineItems = new List<StockAlteration>();
             var productIds = new List<int>();
             var errors = new List<string>();
+
+            float weightGrams = 0;
+
+            foreach(var orderline in request.OrderLines){
+                //we want to run GetProductByGTin as above, to get the product model based on that Gtin...
+                //then compare that to the quantity from our OrderLine  
+                var ourOrderLineProduct = _productRepository.GetProductByGtin(orderline.gtin);
+                float ourOrderLineProductWeight = (float)ourOrderLineProduct.Weight; 
+                var ourOrderLineProductQuantity = orderline.quantity;
+                weightGrams += (ourOrderLineProductQuantity * ourOrderLineProductWeight);
+            }
+            
+            float weightKilograms = weightGrams / 1000;
+            int NoOfTrucks =(int) Math.Ceiling((weightKilograms) / 2000);
+            Log.Info(String.Format("Trucks needed for this order: ", NoOfTrucks));
 
             foreach (var orderLine in request.OrderLines)
             {
@@ -94,6 +118,7 @@ namespace ShipIt.Controllers
             }
 
             _stockRepository.RemoveStock(request.WarehouseId, lineItems);
+            return NoOfTrucks;
         }
     }
 }
