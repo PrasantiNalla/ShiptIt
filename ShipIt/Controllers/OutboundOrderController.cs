@@ -53,19 +53,54 @@ namespace ShipIt.Controllers
             var productIds = new List<int>();
             var errors = new List<string>();
 
+            //Change this to a dictionary where the key is the orderlinegtin, 
+            //and the value is the Total Weight of that orderline
+            List<OrderLineByWeight> ourOrderLinesWeights = new List<OrderLineByWeight>();
+
             float weightGrams = 0;
 
-            foreach(var orderline in request.OrderLines){
-                //we want to run GetProductByGTin as above, to get the product model based on that Gtin...
+            foreach (var orderline in request.OrderLines)
+            {
+                //we want to run GetProductByGtin as above, to get the product model based on that Gtin...
                 //then compare that to the quantity from our OrderLine  
                 var ourOrderLineProduct = _productRepository.GetProductByGtin(orderline.gtin);
-                float ourOrderLineProductWeight = (float)ourOrderLineProduct.Weight; 
+                float ourOrderLineProductWeight = (float)ourOrderLineProduct.Weight;
                 var ourOrderLineProductQuantity = orderline.quantity;
+                float ourOrderLineTotalWeight = ourOrderLineProductQuantity * ourOrderLineProductWeight;
+                ourOrderLinesWeights.Add(new OrderLineByWeight(orderline.gtin, ourOrderLineTotalWeight));
                 weightGrams += (ourOrderLineProductQuantity * ourOrderLineProductWeight);
             }
-            
+
             float weightKilograms = weightGrams / 1000;
-            int NoOfTrucks =(int) Math.Ceiling((weightKilograms) / 2000);
+            int NoOfTrucks = (int)Math.Ceiling((weightKilograms) / 2000);
+            List<Truck> Trucks = new List<Truck>();
+            for (int i = 0; i < NoOfTrucks; i++)
+            {
+                Trucks.Add(new Truck(i));
+            }
+            List<OrderLineByWeight> SortedOrderLineWeights = ourOrderLinesWeights.OrderBy(o => o.OrderWeight).ToList();
+
+            foreach (var order in SortedOrderLineWeights)
+            {
+                foreach (Truck truck in Trucks)
+                {
+                    if (truck.TryAddOrder(order))
+                    {
+                        break;
+                    }
+                }
+            }
+            //what to do if the order couldn't be added to any single truck - it should be broken between multiple trucks 
+
+            //EXAMPLE 
+            /* Two trucks
+            Five OrderLines:
+            #1: 1300kg 
+            #2: 800kg 
+            #3: 800kg
+            #4: 800kg
+            } */
+
             Log.Info(String.Format("Trucks needed for this order: ", NoOfTrucks));
 
             foreach (var orderLine in request.OrderLines)

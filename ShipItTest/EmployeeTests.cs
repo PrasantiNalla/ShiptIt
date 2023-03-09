@@ -18,6 +18,8 @@ namespace ShipItTest
         private const string NAME = "Gissell Sadeem";
         private const int WAREHOUSE_ID = 1;
 
+        private const int Id = 1;
+
         [Test]
         public void TestRoundtripEmployeeRepository()
         {
@@ -27,6 +29,19 @@ namespace ShipItTest
             Assert.AreEqual(employeeRepository.GetEmployeeByName(employee.Name).Name, employee.Name);
             Assert.AreEqual(employeeRepository.GetEmployeeByName(employee.Name).Ext, employee.ext);
             Assert.AreEqual(employeeRepository.GetEmployeeByName(employee.Name).WarehouseId, employee.WarehouseId);
+        }
+
+        [Test]
+        public void TestGetEmployeeById()
+        {
+            onSetUp();
+            var employeeBuilder = new EmployeeBuilder().setId(Id);
+            employeeRepository.AddEmployees(new List<Employee>() {employeeBuilder.CreateEmployee()});
+            var result = employeeController.Get(Id);
+
+            var correctEmployee = employeeBuilder.CreateEmployee();
+            Assert.IsTrue(EmployeesAreEqual(correctEmployee, result.Employees.First()));
+            Assert.IsTrue(result.Success);
         }
 
         [Test]
