@@ -1,4 +1,6 @@
-﻿﻿using System;
+﻿﻿
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
@@ -44,14 +46,31 @@ namespace ShipIt.Controllers
 
             //This variable will store all the order lines that have come into this warehouse, sorted by company 
             Dictionary<Company, List<InboundOrderLine>> orderlinesByCompany = new Dictionary<Company, List<InboundOrderLine>>();
-
+            Dictionary<int, ProductDataModel> orderlinesByProduct = new Dictionary<int, ProductDataModel>();
             foreach (var stock in allStock)
             {
-                //We could get everything outside the forLoop; i.e. get all the product info . Not a great solution
-                // 
-                //A DB call here
+
+                Product product = new Product();
+
+                //we have to create a new instance of the product class every time to add it to orderlines below
+                //but we only should get the info for this instance using GetProductById if we don't have an example of this product already
+
+                //if stock.productID is in our orderlineByProduct dictionary, go get all the product info from there
+                //otherwise create new a product instnace and get it from the database with an API call (getProductByID)
+                if (orderlinesByProduct.ContainsKey(stock.ProductId))
+                {
+                    //get value from the dictionary where the dict key == stock.productId
+                    //var result = List.Where(x => x == "foo").FirstOrDefault();
+                    product = new Product(orderlinesByProduct.FirstOrDefault(x => x.Key == stock.ProductId).Value);
+                }
+                else
+                {
+                    var ourProductDataModel = _productRepository.GetProductById(stock.ProductId);
+                    product = new Product(ourProductDataModel);
+                    orderlinesByProduct.Add(product.Id, ourProductDataModel);
+                }
+                // Product product = new Product(_productRepository.GetProductById(stock.ProductId));
                 bool containsCompanyKey = false;
-                Product product = new Product(_productRepository.GetProductById(stock.ProductId));
                 if (stock.held < product.LowerThreshold && !product.Discontinued)
                 {
                     foreach (var companykey in orderlinesByCompany.Keys)

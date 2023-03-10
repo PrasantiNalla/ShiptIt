@@ -26,9 +26,12 @@ namespace ShipIt.Models.ApiModels
             Discontinued = dataModel.Discontinued == 1;
             MinimumOrderQuantity = dataModel.MinimumOrderQuantity;
         }
-
-        //Empty constructor needed for Xml serialization
         public Product()
+        {
+
+        }
+        //Empty constructor needed for Xml serialization
+        public Product(System.Collections.Generic.KeyValuePair<int, ProductDataModel> keyValuePair)
         {
         }
 
